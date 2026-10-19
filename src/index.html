@@ -3,19 +3,38 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Key Puzzle Registration — Halloween</title>
+  <meta name="description" content="A Halloween trial: prove yourself worthy of the key, solve the sliding puzzle, and continue the journey." />
+  <meta name="theme-color" content="#0a060a" />
+  <title>The Worthy Key — A Halloween Trial</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
+  <div id="backdrop-grain" aria-hidden="true"></div>
+  <canvas id="aura-canvas" aria-hidden="true"></canvas>
+  <div id="pointer-aura" aria-hidden="true"></div>
   <div class="gate-container">
-    <!-- Heading block -->
-    <header class="heading-block" aria-label="Halloween key puzzle heading">
+    <!-- Section 1: Hero -->
+    <header class="hero" aria-label="Welcome">
+      <p class="hero-eyebrow">A Halloween gathering &middot; by invitation of the worthy</p>
       <h1>The key is worthy only of intelligent people</h1>
       <p class="journey-line">Find it to continue the journey</p>
+      <a class="scroll-cue" href="#trial" aria-label="Scroll down to the puzzle trial">
+        <span class="scroll-cue__label">Descend to the trial</span>
+        <svg class="scroll-cue__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4 9 L12 17 L20 9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </a>
     </header>
 
-    <!-- Puzzle container (shown on puzzle step) -->
-    <section class="puzzle-container" id="puzzle" role="region" aria-label="Sliding key puzzle">
+    <!-- Section 2: The trial (puzzle gate, then form, then confirmation) -->
+    <main class="trial" id="trial" aria-label="The trial">
+      <p class="trial-eyebrow" aria-hidden="true">The Trial of the Key</p>
+
+      <!-- Puzzle container (shown on puzzle step) -->
+      <section class="puzzle-container" id="puzzle" role="region" aria-label="Sliding key puzzle">
       <canvas id="puzzle-canvas" width="300" height="300" role="img" aria-label="3x3 sliding tile puzzle"></canvas>
     </section>
 
@@ -46,6 +65,7 @@
       <h2 class="door-message" id="door-message">The door is open now</h2>
       <p class="confirmation-text">Thank you for registering. Your details are saved.</p>
     </section>
+    </main>
   </div>
 
   <script type="module" src="ts/main.ts"></script>

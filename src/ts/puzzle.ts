@@ -16,6 +16,9 @@ import { initForm } from "./form";
 const TILE_COUNT = 8;
 const MIN_SHUFFLE_MOVES = 25;
 const INACTIVITY_MS = 3 * 60 * 1000;
+// The shuffle rescue offer only appears once the visitor has genuinely
+// struggled: at least this many moves made and then gone idle.
+const SHUFFLE_OFFER_MIN_MOVES = 30;
 
 const puzzleEl = document.getElementById("puzzle");
 const formEl = document.getElementById("form");
@@ -307,6 +310,7 @@ function onTileClick(tileId: number): void {
 
   state.moveCount += 1;
   state.lastMoveAt = Date.now();
+  lastMoveAt = state.lastMoveAt;
   state.solved = isSolved(state.board);
 
   renderTiles();
@@ -462,6 +466,13 @@ function onPointerCancel(event: PointerEvent): void {
   finishDrag();
 }
 
+function scrollTrialIntoView(): void {
+  document.getElementById("trial")?.scrollIntoView({
+    behavior: reducedMotion ? "auto" : "smooth",
+    block: "start",
+  });
+}
+
 function onSolved(): void {
   if (shuffleTimer) clearInterval(shuffleTimer);
   shuffleTimer = null;
@@ -498,6 +509,7 @@ function onSolved(): void {
       if (puzzleEl) puzzleEl.hidden = true;
       if (formEl) formEl.hidden = false;
       initForm(); // wire up validation + Next button for the revealed form
+      scrollTrialIntoView();
       gsap.to(formEl, { opacity: 1, duration: 0.5 });
     },
   });
@@ -559,7 +571,13 @@ function resetInactivityTimer(): void {
     clearInterval(shuffleTimer);
   }
   shuffleTimer = window.setInterval(() => {
-    if (Date.now() - lastMoveAt >= INACTIVITY_MS && !shuffleOffered) {
+    if (state.solved || shuffleOffered) return;
+    // Never offer on first glance: only after real effort (≥30 moves)
+    // followed by genuine idleness (3 min without a move).
+    if (
+      state.moveCount >= SHUFFLE_OFFER_MIN_MOVES &&
+      Date.now() - lastMoveAt >= INACTIVITY_MS
+    ) {
       offerShuffle();
     }
   }, 1000);
@@ -604,8 +622,10 @@ function acceptShuffle(): void {
   state.board = newBoard;
   state.moveCount = 0;
   state.lastMoveAt = Date.now();
+  lastMoveAt = state.lastMoveAt;
   state.solved = false;
   state.shuffleOffered = false;
+  shuffleOffered = false;
   emptyIndex = state.board.indexOf(0);
   renderTiles();
   writePuzzleState(state);
@@ -613,6 +633,9 @@ function acceptShuffle(): void {
 }
 
 function declineShuffle(): void {
+  state.lastMoveAt = Date.now();
+  lastMoveAt = state.lastMoveAt;
+  writePuzzleState(state);
   resetInactivityTimer();
 }
 
