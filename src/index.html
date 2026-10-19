@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Key Puzzle Registration — Halloween</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="gate-container">
+    <!-- Heading block -->
+    <header class="heading-block" aria-label="Halloween key puzzle heading">
+      <h1>The key is worthy only of intelligent people</h1>
+      <p class="journey-line">Find it to continue the journey</p>
+    </header>
+
+    <!-- Puzzle container (shown on puzzle step) -->
+    <section class="puzzle-container" id="puzzle" role="region" aria-label="Sliding key puzzle">
+      <canvas id="puzzle-canvas" width="300" height="300" role="img" aria-label="3x3 sliding tile puzzle"></canvas>
+    </section>
+
+    <!-- Registration form container (shown on form step) -->
+    <section class="form-container" id="form" hidden role="region" aria-label="Registration form">
+      <form id="registration-form" novalidate>
+        <div class="field">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" required minlength="1" aria-required="true" />
+          <span class="error" id="name-error" role="alert"></span>
+        </div>
+        <div class="field">
+          <label for="phone">Phone Number</label>
+          <input type="tel" id="phone" name="phone" required pattern="[\\d\\s\\+\-\(\)]{7,}" aria-required="true" />
+          <span class="error" id="phone-error" role="alert"></span>
+        </div>
+        <div class="field">
+          <label for="discountCode">Discount Code</label>
+          <input type="text" id="discountCode" name="discountCode" required minlength="3" aria-required="true" />
+          <span class="error" id="discountCode-error" role="alert"></span>
+        </div>
+        <button type="submit" id="next-btn" class="next-btn">Next</button>
+      </form>
+    </section>
+
+    <!-- Confirmation container (shown on confirmation step) -->
+    <section class="confirmation-container" id="confirmation" hidden role="region" aria-label="Confirmation">
+      <h2 class="door-message" id="door-message">The door is open now</h2>
+      <p class="confirmation-text">Thank you for registering. Your details are saved.</p>
+    </section>
+  </div>
+
+  <script type="module" src="ts/main.ts"></script>
+</body>
+</html>
