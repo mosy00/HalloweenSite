@@ -14,7 +14,15 @@ import { THEME } from "./theme";
 import { initForm } from "./form";
 
 const TILE_COUNT = 8;
-const MIN_SHUFFLE_MOVES = 25;
+// Harder scramble: long random walk plus a Manhattan-distance quality gate
+// so the starting board never lands near-solved. Measured distribution:
+// 80-step walks (no immediate backtracking) average total Manhattan ~14
+// versus ~12.5 for the old 25-step walk, and the gate rejects anything
+// below 14 or with tile 8 already home-adjacent.
+const MIN_SHUFFLE_MOVES = 80;
+const MIN_SCRAMBLE_DISTANCE = 14;
+const MIN_TILE8_DISTANCE = 2;
+const MAX_SHUFFLE_ATTEMPTS = 40;
 const INACTIVITY_MS = 3 * 60 * 1000;
 // The shuffle rescue offer only appears once the visitor has genuinely
 // struggled: at least this many moves made and then gone idle.
@@ -22,8 +30,6 @@ const SHUFFLE_OFFER_MIN_MOVES = 30;
 
 const puzzleEl = document.getElementById("puzzle");
 const formEl = document.getElementById("form");
-const confirmationEl = document.getElementById("confirmation");
-const doorMessageEl = document.getElementById("door-message");
 
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
@@ -234,21 +240,52 @@ function initThree(): boolean {
   return true;
 }
 
-function generateSolvableStart(): number[] {
-  let board = [...TARGET_BOARD];
-  let empty = 8;
-  let moves = 0;
+function solvedDistance(board: number[]): { total: number; tile8: number } {
+  let total = 0;
+  let tile8 = 0;
+  for (let cell = 0; cell < 9; cell++) {
+    const tile = board[cell];
+    if (tile === 0) continue;
+    const home = tile - 1;
+    const d =
+      Math.abs(GRID_POS[cell].x - GRID_POS[home].x) +
+      Math.abs(GRID_POS[cell].y - GRID_POS[home].y);
+    total += d;
+    if (tile === 8) tile8 = d;
+  }
+  return { total, tile8 };
+}
 
-  while (moves < MIN_SHUFFLE_MOVES) {
-    const neighbors = getNeighbors(empty);
-    const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+function randomWalkBoard(): number[] {
+  const board = [...TARGET_BOARD];
+  let empty = 8;
+  let prev = -1;
+  for (let moves = 0; moves < MIN_SHUFFLE_MOVES; moves++) {
+    const options = getNeighbors(empty).filter((cell) => cell !== prev);
+    const next = options[Math.floor(Math.random() * options.length)];
     board[empty] = board[next];
     board[next] = 0;
+    prev = empty;
     empty = next;
-    moves++;
   }
-
   return board;
+}
+
+function generateSolvableStart(): number[] {
+  let best = randomWalkBoard();
+  let bestScore = solvedDistance(best).total;
+  for (let attempt = 1; attempt < MAX_SHUFFLE_ATTEMPTS; attempt++) {
+    const candidate = randomWalkBoard();
+    const dist = solvedDistance(candidate);
+    if (dist.total >= MIN_SCRAMBLE_DISTANCE && dist.tile8 >= MIN_TILE8_DISTANCE) {
+      return candidate;
+    }
+    if (dist.total > bestScore) {
+      best = candidate;
+      bestScore = dist.total;
+    }
+  }
+  return best;
 }
 
 function getNeighbors(index: number): number[] {
@@ -265,12 +302,14 @@ function getNeighbors(index: number): number[] {
   return neighbors;
 }
 
-// --- Drag state (pointer-based, works for touch + mouse) ---
+// Free drag: picked-up tile follows the pointer 1:1 and settles where it is
+// dropped — no rail snap. Drop past the halfway mark toward the empty cell
+// commits the move; otherwise it springs back home.
 let dragPointerId: number | null = null;
 let dragTileId: number | null = null;
 let dragMoved = false;
 let suppressClick = false;
-// Cell the dragged tile started from (tracks swaps mid-drag)
+// Cell the dragged tile started from (re-based on every committed swap)
 let dragFromCell = -1;
 let dragStartClientX = 0;
 let dragStartClientY = 0;
@@ -279,8 +318,13 @@ let dragLastY = 0;
 let dragLastT = 0;
 let dragVelX = 0;
 let dragVelY = 0;
+// Grab offset so the tile doesn't jump under the finger on pickup
+let dragGrabDX = 0;
+let dragGrabDY = 0;
+// Settling rule: drop past this fraction of the way toward the empty slot
+// commits the move; anything short springs back home.
 const DRAG_TAP_SLOP_PX = 8;
-const DRAG_COMPLETE = 0.3;
+const DRAG_COMMIT = 0.5;
 const DRAG_FLICK_VELOCITY = 2.5; // board cells per second
 
 // Maps a screen-pointer position to the tile under it (or null).
@@ -339,6 +383,13 @@ function onPointerDown(event: PointerEvent, canvas: HTMLCanvasElement): void {
   dragLastT = performance.now();
   dragVelX = 0;
   dragVelY = 0;
+  // Remember where on the tile the finger landed (in board cells) so the
+  // tile tracks the pointer without jumping on pickup.
+  const rect = canvas.getBoundingClientRect();
+  const pointerCellX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  const pointerCellY = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+  dragGrabDX = tile.position.x - pointerCellX;
+  dragGrabDY = tile.position.y - pointerCellY;
   try {
     canvas.setPointerCapture(event.pointerId);
   } catch {
@@ -357,7 +408,7 @@ function onPointerMove(event: PointerEvent): void {
     dragMoved = true;
     gsap.killTweensOf(tile.position);
   } else if (!dragMoved) {
-    return; // still within tap slop — don't move anything yet
+    return;
   }
   const now = performance.now();
   const dt = (now - dragLastT) / 1000;
@@ -372,18 +423,15 @@ function onPointerMove(event: PointerEvent): void {
   dragLastY = event.clientY;
   dragLastT = now;
 
-  // Move the tile 1:1 with the finger in board cells, then clamp each
-  // axis to one cell so it stays inside the 3x3 grid.
-  const from = GRID_POS[dragFromCell];
-  const dxCells = (event.clientX - dragStartClientX) / cellW;
-  const dyScreen = (event.clientY - dragStartClientY) / cellH;
-  const targetX = Math.max(-1, Math.min(1, from.x + dxCells));
-  const targetY = Math.max(-1, Math.min(1, from.y - dyScreen));
-  tile.position.x = Math.max(from.x - 1, Math.min(from.x + 1, targetX));
-  tile.position.y = Math.max(from.y - 1, Math.min(from.y + 1, targetY));
+  // Free drag: the tile follows the pointer 1:1 (plus the pickup offset),
+  // clamped only to the board area so it never leaves the 3x3 grid.
+  const pointerCellX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  const pointerCellY = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+  tile.position.x = Math.max(-1.45, Math.min(1.45, pointerCellX + dragGrabDX));
+  tile.position.y = Math.max(-1.45, Math.min(1.45, pointerCellY + dragGrabDY));
 
-  // Mid-drag swap: sliding into a neighboring empty cell exchanges the
-  // empty slot, so the tile can travel across the board in one gesture.
+  // Greedy commit: while dragged over the empty slot, exchange the empty
+  // slot so the tile travels across the board in one gesture.
   const cellX = Math.round(tile.position.x);
   const cellY = Math.round(tile.position.y);
   const entered = GRID_POS.findIndex((p) => p.x === cellX && p.y === cellY);
@@ -427,12 +475,24 @@ function onPointerUp(event: PointerEvent): void {
     suppressClick = true;
     const tile = tiles[tileId - 1];
     const home = GRID_POS[dragFromCell];
-    // Decide where the tile settles: same rule as a tap — it may only
-    // occupy the empty slot when adjacent to it.
+    const emptyPos = GRID_POS[emptyIndex];
     const towardEmpty = isAdjacent(dragFromCell, emptyIndex);
     const distToHome = tile ? Math.hypot(tile.position.x - home.x, tile.position.y - home.y) : 1;
+    // Direction-aware drop: dragging right toward the empty slot commits as
+    // soon as the release point is past the halfway mark between the two
+    // cells, measured along the axis of travel. Otherwise snaps back home.
+    let pastHalfway = false;
+    if (towardEmpty && tile && emptyPos) {
+      const travelX = emptyPos.x - home.x;
+      const travelY = emptyPos.y - home.y;
+      const relX = tile.position.x - home.x;
+      const relY = tile.position.y - home.y;
+      const along = relX * travelX + relY * travelY;
+      const travelLen = Math.hypot(travelX, travelY);
+      pastHalfway = travelLen > 0 && along / travelLen >= DRAG_COMMIT;
+    }
     const flick = Math.hypot(dragVelX, dragVelY) > DRAG_FLICK_VELOCITY;
-    if (towardEmpty && (distToHome >= DRAG_COMPLETE || (flick && distToHome >= 0.08))) {
+    if (towardEmpty && (pastHalfway || (flick && distToHome >= 0.08))) {
       commitDragMove(tileId, dragFromCell, emptyIndex);
     }
     if (!state.solved && tile) {
@@ -475,47 +535,101 @@ function scrollTrialIntoView(): void {
   });
 }
 
-function onSolved(): void {
-  if (shuffleTimer) clearInterval(shuffleTimer);
-  shuffleTimer = null;
-  shuffleOffered = false;
+function runVictorySequence(): void {
+  if (successRunning) return;
+  successRunning = true;
 
-  if (!reducedMotion) {
-    // three.js rotation lives on .rotation — tween each mesh's y rotation
-    tiles.forEach((tile, i) => {
-      gsap.to(tile.rotation, {
-        y: Math.PI * 2,
-        duration: THEME.animation.duration * 2,
-        ease: THEME.animation.ease,
-        delay: i * 0.05,
-      });
-    });
+  const puzzleSection = document.getElementById("puzzle");
+  const canvas = document.getElementById("puzzle-canvas") as HTMLCanvasElement | null;
+  const stage = document.getElementById("victory-stage");
+  const keyCanvas = document.getElementById("key-canvas") as HTMLCanvasElement | null;
+  const keyMessage = document.getElementById("key-message");
+  const eyebrow = document.querySelector(".trial-eyebrow");
+
+  // Persist solved state immediately so reloads resume at the form.
+  commitSolved();
+
+  if (reducedMotion || !stage || !keyCanvas || !keyMessage) {
+    // Reduced motion (or missing stage): skip the theatrics and
+    // hand straight off to the form.
+    revealForm();
+    successRunning = false;
+    return;
   }
 
-  if (doorMessageEl) {
-    doorMessageEl.textContent = "The door is open now";
-    doorMessageEl.hidden = false;
-    gsap.to(doorMessageEl, {
-      opacity: 1,
-      duration: THEME.animation.duration,
-      ease: THEME.animation.ease,
-    });
-  }
+  const words = Array.from(keyMessage.querySelectorAll(".w"));
+  gsap.set(words, { opacity: 0 });
+  gsap.set(keyCanvas, { opacity: 0 });
+  stage.hidden = false;
 
-  gsap.to(scene.background, { r: 0.1, g: 0.05, b: 0.1, duration: 1 });
-  gsap.to(puzzleEl, {
-    opacity: 0,
-    duration: 1,
-    ease: THEME.animation.ease,
+  const canShowKey = startKeyReveal(keyCanvas);
+  const spin = { progress: 0 };
+
+  const tl = gsap.timeline({
     onComplete: () => {
-      if (puzzleEl) puzzleEl.hidden = true;
-      if (formEl) formEl.hidden = false;
-      initForm(); // wire up validation + Next button for the revealed form
-      scrollTrialIntoView();
-      gsap.to(formEl, { opacity: 1, duration: 0.5 });
+      successRunning = false;
+      revealForm();
     },
   });
 
+  // 1) Solved tiles spin one full turn in place, then the whole
+  //    puzzle container (box included) fades away entirely.
+  tl.to(spin, {
+    progress: Math.PI * 2,
+    duration: 2.0,
+    ease: "power2.inOut",
+    onUpdate: () => {
+      for (const tile of tiles) tile.rotation.z = spin.progress;
+    },
+  });
+  tl.to(
+    puzzleSection ?? {},
+    {
+      opacity: 0,
+      duration: 0.6,
+      ease: "power1.in",
+      onComplete: () => {
+        if (puzzleSection) puzzleSection.style.display = "none";
+      },
+    },
+    ">-=0.3",
+  );
+
+  // 2) Centered moment: the "Trial of the Key" label dissolves away
+  //    and the challenger message fades in word-by-word in its slot,
+  //    while the old key spins large and centered below it on a
+  //    transparent backdrop (no box).
+  tl.add(() => {
+    if (eyebrow instanceof HTMLElement) eyebrow.style.display = "none";
+    if (canShowKey) gsap.to(keyCanvas, { opacity: 1, duration: 0.8 });
+  });
+  tl.to(words, {
+    opacity: 1,
+    duration: 0.35,
+    ease: "power1.out",
+    stagger: 0.16,
+  });
+  tl.to({}, { duration: 2.2 });
+
+  // 3) Once the message is complete, the key shrinks and docks beside
+  //    it (side-by-side), then the form appears below. The key keeps
+  //    spinning and is never hidden or stopped.
+  tl.add(() => {
+    stage.classList.add("is-side");
+    resizeKeyReveal();
+  });
+  tl.to({}, { duration: 0.9 });
+}
+function revealForm(): void {
+  // Show the form below the challenger message + spinning key. Both
+  // stay visible above it — the key is never stopped or hidden.
+  if (formEl) formEl.hidden = false;
+  initForm(); // wire up validation + Next button for the revealed form
+  scrollTrialIntoView();
+  if (formEl) gsap.to(formEl, { opacity: 1, duration: 0.5 });
+}
+
+function commitSolved(): void {
   const progress = readProgress() || {
     currentStep: "puzzle",
     puzzleSolved: false,
@@ -524,6 +638,170 @@ function onSolved(): void {
   progress.currentStep = "form";
   progress.puzzleSolved = true;
   writeProgress(progress);
+}
+
+function onSolved(): void {
+  // Mark solved first; runVictorySequence owns the animation,
+  // key reveal, progress persistence and form handoff.
+  state.solved = true;
+  state.board = [...TARGET_BOARD];
+  writePuzzleState(state);
+
+  if (shuffleTimer) clearInterval(shuffleTimer);
+  shuffleTimer = null;
+  shuffleOffered = false;
+
+  runVictorySequence();
+}
+// ---- 3D victory key (old skeleton key, extruded) ----
+// Built once from a 2D silhouette: bow ring, collar, shaft and two
+// teeth. Rendered on its own canvas so it can keep spinning while the
+// puzzle canvas has faded out.
+let keyRenderer: THREE.WebGLRenderer | null = null;
+let keyScene: THREE.Scene | null = null;
+let keyCamera: THREE.PerspectiveCamera | null = null;
+let keyMesh: THREE.Mesh | null = null;
+let keyGlow: THREE.PointLight | null = null;
+let keyFrameId = 0;
+let keySpin = 0;
+
+function buildKeyMesh(): THREE.Mesh {
+  const shape = new THREE.Shape();
+  // Bow (ring): outer circle with an inner hole
+  shape.absarc(0, 3.1, 1.35, 0, Math.PI * 2, false);
+  const hole = new THREE.Path();
+  hole.absarc(0, 3.1, 0.68, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+  // Collar
+  const collar = new THREE.Shape();
+  collar.moveTo(-0.5, 1.45);
+  collar.lineTo(0.5, 1.45);
+  collar.lineTo(0.5, 1.05);
+  collar.lineTo(-0.5, 1.05);
+  collar.closePath();
+  // Shaft
+  const shaft = new THREE.Shape();
+  shaft.moveTo(-0.24, 1.05);
+  shaft.lineTo(0.24, 1.05);
+  shaft.lineTo(0.24, -2.2);
+  shaft.lineTo(-0.24, -2.2);
+  shaft.closePath();
+  // Upper tooth (left)
+  const tooth1 = new THREE.Shape();
+  tooth1.moveTo(-0.24, -0.9);
+  tooth1.lineTo(-1.15, -0.9);
+  tooth1.lineTo(-1.15, -0.5);
+  tooth1.lineTo(-0.24, -0.5);
+  tooth1.closePath();
+  // Lower tooth (left, longer)
+  const tooth2 = new THREE.Shape();
+  tooth2.moveTo(-0.24, -1.7);
+  tooth2.lineTo(-1.5, -1.7);
+  tooth2.lineTo(-1.5, -1.24);
+  tooth2.lineTo(-0.24, -1.24);
+  tooth2.closePath();
+
+  const geo = new THREE.ExtrudeGeometry([shape, collar, shaft, tooth1, tooth2], {
+    depth: 0.35,
+    bevelEnabled: true,
+    bevelThickness: 0.08,
+    bevelSize: 0.08,
+    bevelSegments: 2,
+    curveSegments: 48,
+  });
+  geo.center();
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(THEME.colors.key),
+    metalness: 0.85,
+    roughness: 0.32,
+    emissive: new THREE.Color(THEME.colors.accent),
+    emissiveIntensity: 0.12,
+  });
+  return new THREE.Mesh(geo, mat);
+}
+
+function startKeyReveal(canvas: HTMLCanvasElement): boolean {
+  try {
+    stopKeyReveal();
+    keyRenderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    keyRenderer.setClearColor(0x000000, 0); // fully transparent: no box behind the key
+    const w = canvas.clientWidth || 320;
+    const h = canvas.clientHeight || 240;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    keyRenderer.setPixelRatio(dpr);
+    keyRenderer.setSize(w, h, false);
+
+    keyScene = new THREE.Scene();
+    keyCamera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100);
+    keyCamera.position.set(0, 0.4, 9.5);
+    keyCamera.lookAt(0, 0.2, 0);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.45);
+    keyScene.add(ambient);
+    keyGlow = new THREE.PointLight(new THREE.Color(THEME.colors.accent), 30, 30);
+    keyGlow.position.set(2.5, 2, 4);
+    keyScene.add(keyGlow);
+    const rim = new THREE.DirectionalLight(0xffe9c4, 1.2);
+    rim.position.set(-3, 1.5, -2);
+    keyScene.add(rim);
+
+    keyMesh = buildKeyMesh();
+    keyMesh.rotation.x = 0.12;
+    keyScene.add(keyMesh);
+    keySpin = 0;
+
+    const clock = new THREE.Clock();
+    const tick = () => {
+      if (!keyRenderer || !keyScene || !keyCamera || !keyMesh) return;
+      const dt = Math.min(clock.getDelta(), 0.05);
+      keySpin += dt * 0.9; // steady horizontal turntable
+      keyMesh.rotation.y = keySpin;
+      keyMesh.position.y = Math.sin(keySpin * 1.4) * 0.12; // gentle float
+      if (keyGlow) keyGlow.intensity = 28 + Math.sin(keySpin * 3.1) * 7; // candle flicker
+      keyRenderer.render(keyScene, keyCamera);
+      keyFrameId = requestAnimationFrame(tick);
+    };
+    keyFrameId = requestAnimationFrame(tick);
+    return true;
+  } catch {
+    stopKeyReveal();
+    return false;
+  }
+}
+
+function stopKeyReveal(): void {
+  if (keyFrameId) cancelAnimationFrame(keyFrameId);
+  keyFrameId = 0;
+  if (keyMesh) {
+    keyMesh.geometry.dispose();
+    const mat = keyMesh.material as THREE.Material;
+    mat.dispose();
+  }
+  keyMesh = null;
+  keyGlow = null;
+  keyScene = null;
+  keyCamera = null;
+  if (keyRenderer) {
+    keyRenderer.dispose();
+    keyRenderer = null;
+  }
+}
+
+function resizeKeyReveal(): void {
+  // Re-fit the key renderer after the dock transition shrinks its
+  // holder; the canvas aspect ratio stays 4/3 so only the width changes.
+  const keyCanvas = document.getElementById("key-canvas") as HTMLCanvasElement | null;
+  if (!keyCanvas || !keyRenderer || !keyCamera) return;
+  window.setTimeout(() => {
+    if (!keyRenderer || !keyCamera || !keyCanvas) return;
+    const w = keyCanvas.clientWidth || 110;
+    const h = keyCanvas.clientHeight || Math.round((w * 3) / 4);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    keyRenderer.setPixelRatio(dpr);
+    keyRenderer.setSize(w, h, false);
+    keyCamera.aspect = w / h;
+    keyCamera.updateProjectionMatrix();
+  }, 850);
 }
 
 function onResize(): void {

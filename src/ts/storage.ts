@@ -67,4 +67,18 @@ function writeJSON<T>(key: StorageKey, value: T): boolean {
   }
 }
 
+// Removes every key this site stored (puzzle, progress, registration).
+// Returns true when storage was reachable and cleared.
+export function clearAllSiteData(): boolean {
+  if (!isStorageAvailable()) return false;
+  try {
+    localStorage.removeItem(PUZZLE_KEY);
+    localStorage.removeItem(PROGRESS_KEY);
+    localStorage.removeItem(REGISTRATION_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export { PUZZLE_KEY, PROGRESS_KEY, REGISTRATION_KEY };

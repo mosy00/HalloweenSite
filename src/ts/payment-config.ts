@@ -4,14 +4,14 @@ export const PAYMENT_CONFIG = {
   DISCOUNT_CODE: "SPOOKYFRIEND",
 
   // Ticket prices in Toman.
-  FULL_PRICE: 3800000,
+  FULL_PRICE: 3600000,
   DISCOUNTED_PRICE: 2900000,
-  FULL_PRICE_LABEL: "3.8M Toman",
+  FULL_PRICE_LABEL: "3.6M Toman",
   DISCOUNTED_PRICE_LABEL: "2.9M Toman",
 
   // Debit card shown to the visitor for the manual transfer.
-  CARD_NUMBER: "6037-9912-5679-5240",
-  CARD_OWNER: "Soroush Faghedi",
+  CARD_NUMBER: "6219-8619-7928-8668",
+  CARD_OWNER: "Ayda Ghobbeh",
 
   // Receipt upload rules (must match the GF File field settings).
   ALLOWED_EXTENSIONS: ["jpg", "jpeg", "png"] as const,

@@ -476,6 +476,104 @@ html {
   color: var(--text);
 }
 
+/* Victory stage: challenger message + 3D old key.
+   Phase 1 (centered): message fades in word-by-word where the trial
+   label stood; the key spins large and centered below it on a
+   transparent backdrop (no box). Phase 2 (.is-side): the key shrinks
+   and docks beside the message, then the form appears below. */
+.victory-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  width: min(100%, 560px);
+  margin: 0 auto;
+  transition: gap 0.8s ease;
+}
+
+.key-holder {
+  width: min(100%, 320px);
+  display: flex;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  transition: width 0.8s ease;
+}
+
+.key-holder canvas {
+  background: transparent;
+}
+
+.victory-stage.is-side {
+  flex-direction: row;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.victory-stage.is-side .key-holder {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.victory-stage.is-side .key-message {
+  text-align: left;
+  font-size: clamp(1rem, 3.4vw, 1.3rem);
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .victory-stage.is-side {
+    gap: 0.85rem;
+  }
+
+  .victory-stage.is-side .key-holder {
+    width: 84px;
+  }
+}
+
+#puzzle-canvas {
+  transition: opacity 0.6s ease;
+}
+
+#puzzle-canvas.is-fading {
+  opacity: 0;
+}
+
+#key-canvas {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: block;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.key-message {
+  font-family: var(--display);
+  font-size: clamp(1.15rem, 4vw, 1.7rem);
+  line-height: 1.6;
+  text-align: center;
+  color: var(--gold);
+  text-shadow: 0 0 24px rgba(212, 160, 23, 0.35);
+  margin: 0;
+}
+
+.key-message .w {
+  opacity: 0;
+  display: inline-block;
+}
+
+/* Trial eyebrow crossfade handle during the victory swap */
+.trial-eyebrow {
+  transition: opacity 0.4s ease;
+}
+
+.trial-eyebrow.is-fading {
+  opacity: 0;
+}
+
 /* Confirmation container */
 .confirmation-container {
   text-align: center;
@@ -517,6 +615,33 @@ html {
     border-radius: 12px;
     padding: 1.25rem;
   }
+}
+
+/* Tiny footer credit + reset line (outside the centered container so it
+   sits at the very bottom of the page) */
+.site-footer {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 0 1rem 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
+.reset-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.reset-link:hover {
+  color: var(--text);
 }
 
 /* Reduced motion preference (FR-012, SC-007): keep the scroll cue

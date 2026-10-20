@@ -32,6 +32,12 @@
     <!-- Section 2: The trial (puzzle gate, then form, then confirmation) -->
     <main class="trial" id="trial" aria-label="The trial">
       <p class="trial-eyebrow" aria-hidden="true">The Trial of the Key</p>
+      <div class="victory-stage" id="victory-stage" hidden>
+        <p class="key-message" id="key-message" aria-live="polite"><span class="w">Wow,</span> <span class="w">a</span> <span class="w">new</span> <span class="w">challenger</span> <span class="w">approaches!</span><br /><span class="w">Just</span> <span class="w">one</span> <span class="w">step</span> <span class="w">to</span> <span class="w">join</span> <span class="w">the</span> <span class="w">crew</span></p>
+        <div class="key-holder" id="key-holder">
+          <canvas id="key-canvas" role="img" aria-label="The worthy key, rotating"></canvas>
+        </div>
+      </div>
 
       <!-- Puzzle container (shown on puzzle step) -->
       <section class="puzzle-container" id="puzzle" role="region" aria-label="Sliding key puzzle">
@@ -111,6 +117,10 @@
     </section>
     </main>
   </div>
+
+  <footer class="site-footer">
+    <small><button type="button" id="reset-trial" class="reset-link">Click to reset the trial</button>. Made by Mosy.</small>
+  </footer>
 
   <script type="module" src="ts/main.ts"></script>
 </body>

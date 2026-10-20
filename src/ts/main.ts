@@ -4,7 +4,7 @@
 import { initPuzzle } from "./puzzle";
 import { initForm, applyServerErrors } from "./form";
 import { initAura } from "./aura";
-import { readProgress, readRegistrationData, writeProgress } from "./storage";
+import { readProgress, readRegistrationData, writeProgress, clearAllSiteData } from "./storage";
 import { goToStep } from "./step";
 import type { JourneyStep } from "./types";
 import {
@@ -55,6 +55,17 @@ export function initApp(): void {
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       target.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
     });
+  });
+
+  // Footer reset: ask first (this wipes puzzle, form, payment + confirmation
+  // progress), then clear all stored data and reload from the start.
+  document.getElementById("reset-trial")?.addEventListener("click", () => {
+    const confirmed = window.confirm(
+      "Reset the trial? This restarts everything — your puzzle progress, registration details and payment step will all be erased."
+    );
+    if (!confirmed) return;
+    clearAllSiteData();
+    window.location.reload();
   });
 
   if (progress) {
