@@ -1,33 +1,31 @@
-// Registration form — validation, save, confirmation/error
+// Registration form — validation, save, then hand off to payment step
 // Covers US2 tasks T019–T025
 
 import type { RegistrationData } from "./types";
 import { writeRegistrationData, readRegistrationData, writeProgress } from "./storage";
 import { THEME } from "./theme";
-import { gsap } from "gsap";
+import { goToStep } from "./step";
+import { initPayment } from "./main";
 
 const formEl = document.getElementById("registration-form");
 const nextBtn = document.getElementById("next-btn") as HTMLButtonElement;
 const nameInput = document.getElementById("name") as HTMLInputElement;
 const phoneInput = document.getElementById("phone") as HTMLInputElement;
-const discountCodeInput = document.getElementById("discountCode") as HTMLInputElement;
+const secretCodeInput = document.getElementById("secretCode") as HTMLInputElement;
 const nameError = document.getElementById("name-error");
 const phoneError = document.getElementById("phone-error");
-const discountCodeError = document.getElementById("discountCode-error");
-const confirmationEl = document.getElementById("confirmation");
-const doorMessageEl = document.getElementById("door-message");
+const secretCodeError = document.getElementById("secretCode-error");
 
 // Validation patterns per data-model.md (FR-007, FR-015)
 const PHONE_PATTERN = /^[\d\s\+\-\(\)]{7,}$/;
-const MIN_DISCOUNT_LENGTH = 3;
 
 let isSubmitting = false;
 
 function clearErrors(): void {
-  [nameError, phoneError, discountCodeError].forEach((el) => {
+  [nameError, phoneError, secretCodeError].forEach((el) => {
     if (el) el.textContent = "";
   });
-  [nameInput, phoneInput, discountCodeInput].forEach((el) => {
+  [nameInput, phoneInput, secretCodeInput].forEach((el) => {
     el.setAttribute("aria-invalid", "false");
   });
 }
@@ -59,20 +57,39 @@ function validateForm(): boolean {
     valid = false;
   }
 
-  const discountCode = discountCodeInput.value.trim();
-  if (!discountCode || discountCode.length < MIN_DISCOUNT_LENGTH) {
-    showError(
-      discountCodeError,
-      `Discount code must be at least ${MIN_DISCOUNT_LENGTH} characters.`
-    );
-    setInputError(discountCodeInput, true);
+  // Secret code is optional — wrong/blank code just means full price.
+  const secretCode = secretCodeInput.value.trim();
+  if (secretCode && secretCode.length < 3) {
+    showError(secretCodeError, "Secret code must be at least 3 characters.");
+    setInputError(secretCodeInput, true);
     valid = false;
   }
 
   return valid;
 }
 
+// Show server-side (Gravity Forms) validation messages on the matching
+// registration fields. Called from the payment step when a 400 response
+// contains errors for the Name (field 1) or Phone (field 3) inputs, so the
+// visitor is routed back to the form step that owns those fields.
+export function applyServerErrors(errors: { name?: string; phone?: string }): void {
+  clearErrors();
+  let firstInvalid: HTMLInputElement | null = null;
+  if (errors.name) {
+    showError(nameError, errors.name);
+    setInputError(nameInput, true);
+    firstInvalid = nameInput;
+  }
+  if (errors.phone) {
+    showError(phoneError, errors.phone);
+    setInputError(phoneInput, true);
+    if (!firstInvalid) firstInvalid = phoneInput;
+  }
+  if (firstInvalid) firstInvalid.focus({ preventScroll: true });
+}
+
 function setBusy(busy: boolean): void {
+  isSubmitting = busy;
   isSubmitting = busy;
   if (nextBtn) {
     nextBtn.disabled = busy;
@@ -97,28 +114,6 @@ function showThemedError(message: string): void {
   formEl?.insertBefore(errEl, formEl.firstChild);
 }
 
-function showThemedConfirmation(): void {
-  if (doorMessageEl) {
-    doorMessageEl.textContent = "The door is open now";
-    doorMessageEl.hidden = false;
-  }
-  if (formEl) formEl.hidden = true;
-  if (confirmationEl) confirmationEl.hidden = false;
-  gsapConfirm();
-}
-
-function gsapConfirm(): void {
-  // GSAP entrance animation for the confirmation panel
-  if (confirmationEl) {
-    gsap.from(confirmationEl, {
-      opacity: 0,
-      y: 20,
-      duration: 0.5,
-      ease: "power2.out",
-    });
-  }
-}
-
 async function onSubmit(event: Event): Promise<void> {
   event.preventDefault();
 
@@ -132,7 +127,7 @@ async function onSubmit(event: Event): Promise<void> {
   const data: RegistrationData = {
     name: nameInput.value.trim(),
     phone: phoneInput.value.trim(),
-    discountCode: discountCodeInput.value.trim(),
+    discountCode: secretCodeInput.value.trim(),
     saveStatus: null,
     savedAt: null,
   };
@@ -144,15 +139,15 @@ async function onSubmit(event: Event): Promise<void> {
       data.savedAt = Date.now();
       writeRegistrationData(data);
 
-      // Update progress to confirmation
+      // Hand off to the payment step and wire up its buttons
       const progress = {
-        currentStep: "confirmation" as const,
+        currentStep: "payment" as const,
         puzzleSolved: true,
         formSubmitted: true,
       };
       writeProgress(progress);
-
-      showThemedConfirmation();
+      goToStep("payment");
+      initPayment();
     } else {
       // FR-009: storage unavailable or full
       data.saveStatus = "failed";
@@ -177,19 +172,19 @@ export function initForm(): void {
   if (saved) {
     nameInput.value = saved.name || "";
     phoneInput.value = saved.phone || "";
-    discountCodeInput.value = saved.discountCode || "";
+    secretCodeInput.value = saved.discountCode || "";
   }
 
   formEl.addEventListener("submit", onSubmit);
 
   // Clear errors on input
-  [nameInput, phoneInput, discountCodeInput].forEach((input) => {
+  [nameInput, phoneInput, secretCodeInput].forEach((input) => {
     input.addEventListener("input", () => {
       setInputError(input, false);
       const errorMap: Record<string, HTMLElement | null> = {
         name: nameError,
         phone: phoneError,
-        discountCode: discountCodeError,
+        secretCode: secretCodeError,
       };
       if (errorMap[input.id]) errorMap[input.id]!.textContent = "";
     });

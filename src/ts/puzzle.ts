@@ -451,6 +451,8 @@ function onPointerUp(event: PointerEvent): void {
     finishDrag();
   } else {
     // Genuine tap (within slop): same behavior as the click handler.
+    // Suppress the follow-up click event so the tile only moves once.
+    suppressClick = true;
     finishDrag();
     onTileClick(tileId);
   }

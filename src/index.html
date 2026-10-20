@@ -48,16 +48,60 @@
         </div>
         <div class="field">
           <label for="phone">Phone Number</label>
-          <input type="tel" id="phone" name="phone" required pattern="[\\d\\s\\+\-\(\)]{7,}" aria-required="true" />
+          <input type="tel" id="phone" name="phone" required pattern="[\d\s\+\-\(\)]{7,}" placeholder="9123456789" aria-required="true" />
           <span class="error" id="phone-error" role="alert"></span>
         </div>
         <div class="field">
-          <label for="discountCode">Discount Code</label>
-          <input type="text" id="discountCode" name="discountCode" required minlength="3" aria-required="true" />
-          <span class="error" id="discountCode-error" role="alert"></span>
+          <label for="secretCode">Secret Code</label>
+          <input type="text" id="secretCode" name="secretCode" />
+          <span class="error" id="secretCode-error" role="alert"></span>
         </div>
         <button type="submit" id="next-btn" class="next-btn">Next</button>
       </form>
+    </section>
+
+    <!-- Payment container (shown on payment step) -->
+    <section class="payment-container" id="payment" hidden role="region" aria-label="Payment details">
+      <h2 class="payment-title">Complete Your Registration</h2>
+      <p class="payment-subtitle">Transfer the amount to the card below, then upload your receipt.</p>
+
+      <!-- Debit card reveal: shown once the form is submitted -->
+      <div class="card-display" id="card-display" hidden>
+        <div class="card">
+          <div class="card-front">
+            <div class="card-chip"></div>
+            <div class="card-number" id="card-number">**** · **** · **** · ****</div>
+            <div class="card-holder" id="card-holder">CARDHOLDER NAME</div>
+          </div>
+        </div>
+        <div class="card-details">
+          <div class="price-row">
+            <span class="price-label">Ticket Price:</span>
+            <span class="price-value" id="payment-price">3.8M Toman</span>
+          </div>
+          <div class="transfer-note">
+            Transfer the amount to the card above, then upload your transaction receipt below.
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="receipt-file">Upload Transaction Receipt</label>
+        <input
+          type="file"
+          id="receipt-file"
+          name="receipt-file"
+          accept=".jpg,.jpeg,.png"
+        />
+        <span class="error" id="receipt-error" role="alert"></span>
+      </div>
+
+      <div class="payment-actions">
+        <button type="button" id="payment-submit-btn" class="next-btn">
+          Confirm &amp; Submit
+        </button>
+        <button type="button" id="payment-back-btn" class="back-btn">Back</button>
+      </div>
     </section>
 
     <!-- Confirmation container (shown on confirmation step) -->

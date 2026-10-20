@@ -323,6 +323,159 @@ html {
   cursor: not-allowed;
 }
 
+/* ---------- Section 3: Payment ---------- */
+
+.payment-container {
+  width: min(100%, 460px);
+  margin: 0 auto;
+  background: linear-gradient(160deg, rgba(45, 27, 45, 0.92), rgba(20, 8, 20, 0.94));
+  border: 1px solid rgba(255, 107, 0, 0.45);
+  border-radius: 16px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.payment-title {
+  font-family: var(--display);
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 0.25rem;
+}
+
+.payment-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.apply-btn {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.25rem;
+}
+
+.apply-btn:hover {
+  background: rgba(255, 107, 0, 0.15);
+}
+
+/* Debit card visual */
+.card-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.card {
+  width: 100%;
+  max-width: 300px;
+  height: 160px;
+  background: linear-gradient(135deg, #2d1b2d 0%, #1a0a1a 100%);
+  border: 1px solid rgba(255, 107, 0, 0.4);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-front {
+  padding: 1.25rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.card-chip {
+  width: 40px;
+  height: 28px;
+  background: linear-gradient(135deg, #d4a017, #e8c570);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  margin-bottom: 1.5rem;
+}
+
+.card-number {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 1.1rem;
+  color: var(--text);
+  letter-spacing: 0.12em;
+}
+
+.card-holder {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.card-details {
+  width: 100%;
+  max-width: 300px;
+  text-align: left;
+}
+
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.price-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.price-value {
+  font-family: var(--display);
+  font-size: 1.5rem;
+  color: var(--success);
+  font-weight: 700;
+}
+
+.transfer-note {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.payment-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.back-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 107, 0, 0.5);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.back-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
 /* Confirmation container */
 .confirmation-container {
   text-align: center;

@@ -12,13 +12,14 @@ export interface PuzzleState {
 }
 
 // VisitorProgress — stored under halloween_001_progress
-export type JourneyStep = "puzzle" | "form" | "confirmation";
+export type JourneyStep = "puzzle" | "form" | "payment" | "confirmation";
 
 export interface VisitorProgress {
   currentStep: JourneyStep;
   puzzleSolved: boolean;
   formSubmitted: boolean;
 }
+
 
 // RegistrationData — stored under halloween_001_registration
 export type SaveStatus = "saved" | "failed" | null;
@@ -30,3 +31,19 @@ export interface RegistrationData {
   saveStatus: SaveStatus;       // Last save outcome
   savedAt: number | null;       // Timestamp of last successful save, integer ≥ 0 or null
 }
+
+// PaymentData — FR-016: discount-gated payment + receipt upload.
+export type PriceTier = "full" | "discounted";
+
+export interface PaymentData {
+  name: string;                 // input_1_1_3 (Name)
+  phone: string;                // input_1_3_visible (Phone)
+  discountCode: string;         // Raw code entered by the user
+  priceTier: PriceTier;         // "full" or "discounted"
+  amount: number;               // 3_800_000 or 2_900_000 (Toman)
+  priceLabel: string;           // "3.8M Toman" / "2.9M Toman"
+  receiptFile?: File;           // GF file field value
+}
+
+
+
